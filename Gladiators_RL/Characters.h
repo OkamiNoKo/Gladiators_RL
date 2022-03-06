@@ -20,6 +20,32 @@ class Character
 			CoolDown, //перезарядка способности
 			CoolDownTimer, //Таймер до использования способности
 			Stunned; //Длительность текущего оглушения
+		Point
+			Capcan[3],
+		    SkillPosition;
+		void SkillUse(Character sec)
+		{
+			return;
+		}
+		bool amiInCap(Character sec)
+		{
+			bool res = false;
+			for (int i = 0; i < 3; i++)
+			{
+				if (position.x == sec.Capcan[i].x && position.y == sec.Capcan[i].y)
+				{
+					res = true;
+					sec.Capcan[i].x = -1;
+					sec.Capcan[i].y = -1;
+				}
+			}
+			return res;
+		}
+
+		bool amiInJija(Character sec)
+		{
+			return (abs(position.x - sec.position.x) + abs(position.y - sec.position.y) <= 1);
+		}
 };
 
 /// Пират оружие ближнего боя, скил - крюк, подтягивает любого противника на расстоянии 7 клеток, оглушая его на ход
@@ -42,10 +68,20 @@ public:
 		HookDistance = 5;
 		Stunned = 0;
 	}
+	void SkillUse(Character& sec)
+	{
+		CoolDownTimer = CoolDown;
+		if ((abs(position.x - sec.position.x) + abs(position.y - sec.position.y)) <= HookDistance)
+		{
+			sec.position.x = position.x - (position.x - sec.position.x) / abs(position.x - sec.position.x);
+			sec.position.y = position.y - (position.y - sec.position.y) / abs(position.y - sec.position.y);
+			sec.Stunned++;
+		}
+	}
 };
 
 /// Маг, верткий тип, обладает опасной магией на дистанции, ну а вблизи его магия еще опаснее. 
-/// Может телепортироваться на небольшие расстояния
+/// У деда деменция, поэтому телепортируется в случайное место
 class Mage :Character
 {
 public:
@@ -65,6 +101,12 @@ public:
 		BlinkDistance = 5;
 		Stunned = 0;
 	}
+	void SkillUse(Character& sec)
+	{
+		CoolDownTimer = CoolDown;
+		position.x = rand() % 16;
+		position.y = rand() % 16;
+	}
 };
 
 /// Рэнджер, неприятный противник, его меткие выстрелы гораздо опаснее на дистанции.
@@ -76,9 +118,7 @@ public:
 class Ranger :Character
 {
 public:
-	Point Capcan1;
-	Point Capcan2;
-	Point Capcan3;
+	Point Capcan[3];
 	int CapcanDamage;
 	int capNum;
 	int capRange;
@@ -94,13 +134,20 @@ public:
 		secondRange = 4;
 		CoolDown = 2;
 		CoolDownTimer = 0;
-		Capcan1.x = -1, Capcan1.y = -1;
-		Capcan2.x = -1, Capcan2.y = -1;
-		Capcan3.x = -1, Capcan3.y = -1;
+		Capcan[0].x = -1, Capcan[0].y = -1;
+		Capcan[1].x = -1, Capcan[1].y = -1;
+		Capcan[2].x = -1, Capcan[2].y = -1;
 		capNum = 0;
 		CapcanDamage = 3;
 		//capRange = 1; Срет капканами под себя
 		Stunned = 0;
+	}
+	void SkillUse(Character& sec)
+	{
+		CoolDownTimer = CoolDown;
+		Capcan[capNum % 3].x = position.x;
+		Capcan[capNum % 3].y = position.y;
+		capNum++;
 	}
 };
 
@@ -129,6 +176,14 @@ public:
 		NetStun = 2;
 		Stunned = 0;
 	}
+	void SkillUse(Character& sec)
+	{
+		CoolDownTimer = CoolDown;
+		if ((abs(position.x - sec.position.x) + abs(position.y - sec.position.y)) <= NetDistance)
+		{
+			sec.Stunned += 2;
+		}
+	}
 };
 
 /// Волшебник обладает шлубокими познаниями в магии, а также огромным арсеналом заклинаний
@@ -155,5 +210,11 @@ public:
 		SkillPosition.x = 0, SkillPosition.y = 0;
 		Stunned = 0;
 		SkillRange = 2;
+	}
+	void SkillUse(Character& sec)
+	{
+		CoolDownTimer = CoolDown;
+		SkillPosition.x = position.x;
+		SkillPosition.y = position.y;
 	}
 };

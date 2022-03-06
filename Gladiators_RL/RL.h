@@ -9,6 +9,12 @@ int gamma = 0.99;
 int alpha = 0.17;
 int epsilon = 0.067;
 
+struct moveResult
+{
+	Point pos;
+	bool skill;
+};
+
 
 Point SpawnChooseFirst(double mass[256][256][2]) //side 0 лево, 1 право;
 {
@@ -91,7 +97,7 @@ Point SpawnChooseSecond(double mass[256][256][2], Point firstChoose) //side 0 ле
 	return ChoosenOne;
 }
 
-Point MoveChoose(double mass[256][256][2], Point position1, Point position2, int maxMove) //side 0 лево, 1 право;
+moveResult MoveChoose(double mass[256][256][2], Point position1, Point position2, int maxMove) //side 0 лево, 1 право;
 {
 
 }
@@ -102,8 +108,10 @@ void Learning()
 	int gameRes[5][5];
 	for (int i = 0; i < 5; i++)
 	{
-		for (int j = i; j < 5; j++)
+		for (int j = 0; j < 5; j++)
 		{
+			gameRes[i][j] = 0;
+
 			double FirstM[256][256][2];
 			double SecondM[256][256][2];
 			for (int i0 = 0; i0 < 256; i0++)
@@ -168,14 +176,147 @@ void Learning()
 				}
 
 				bool flag = true;
+				double fullRes = 0;
+				double result;
+				bool FSkill = 0, SSkill = 0;
 				for (int T = 0; T < 100 && flag; T++)
 				{
+					Point firstStart, secondStart;
+					firstStart.x = First.position.x; firstStart.y = First.position.y;
+					secondStart.x = Second.position.x; secondStart.y = Second.position.y;
+					result = 0;
+					moveResult FR;
+					moveResult SR;
 					/// Расчитать Станы, могут ли ходить т.к. станы. Сел ли в капкан?
-					MoveChoose(FirstM, First.position, Second.position, First.maxMove);
-					// расчитываем урон и проверяем флаг
-					MoveChoose(SecondM, Second.position, First.position, Second.maxMove);
+					if (First.Stunned > 0)
+					{
+						First.Stunned--;
+						First.CoolDownTimer--;
+					}
+					else
+					{
+				
+						//в выборе хода долэна быть проыерка на возможность скила
+						FR = MoveChoose(FirstM, First.position, Second.position, First.maxMove);
+						if (FR.skill == true)
+						{
+							First.SkillUse(Second);
+						}
+						else
+						{
+							First.CoolDownTimer--;
+						}
+						//расписать урон
+						if ((abs(First.position.x - Second.position.x) + abs(First.position.y - Second.position.y)) < First.firstRange)
+						{
+							Second.Hp -= First.firstDamage;
+							result += First.firstDamage / Second.Hp;
+							if (i == 4 && Second.amiInJija(First))
+							{
+								Second.Hp -= First.firstDamage;
+								result += First.firstDamage / Second.Hp;
+							}
+						}
+						else
+						{
+							if ((abs(First.position.x - Second.position.x) + abs(First.position.y - Second.position.y)) < First.secondRange)
+							{
+								Second.Hp -= First.secondDamage;
+								result += First.secondDamage / Second.Hp;
+							}
+						}
+						First.position.x = FR.pos.x;
+						First.position.y = FR.pos.y;
+						//if () наступил в капкан и стоит ли в жиже?	
+						if (j == 2)
+						{
+							if (First.amiInCap(Second))
+							{
+								First.Stunned += 1;
+								First.Hp -= 3;
+								result -= 3 / First.Hp;
+							}
+						}
+					}
+
+
+					if(Second.Hp <= 0)
+					{
+						flag = false;
+						fullRes += 13;
+					}
+					if (Second.Stunned > 0)
+					{
+						Second.Stunned--;
+						Second.CoolDownTimer--;
+					}
+					else
+					{
+
+						SR = MoveChoose(SecondM, Second.position, First.position, Second.maxMove);
+
+						if (SR.skill == true)
+						{
+							Second.SkillUse(First);
+						}
+						else
+						{
+							Second.CoolDownTimer--;
+						}
+
+						if ((abs(First.position.x - Second.position.x) + abs(First.position.y - Second.position.y)) < Second.firstRange)
+						{
+							First.Hp -= Second.firstDamage;
+							result -= Second.firstDamage / First.Hp;
+						}
+						else
+						{
+							if ((abs(First.position.x - Second.position.x) + abs(First.position.y - Second.position.y)) < Second.secondRange)
+							{
+								First.Hp -= Second.secondDamage;
+								result -= Second.secondDamage / First.Hp;
+
+								if (j == 4 && First.amiInJija(Second))
+								{
+									First.Hp -= Second.secondDamage;
+									result -= Second.secondDamage / First.Hp;
+								}
+							}
+						}
+						Second.position.x = SR.pos.x;
+						Second.position.y = SR.pos.y;
+						if (i == 2)
+						{
+							if (Second.amiInCap(First))
+							{
+								Second.Stunned += 1;
+								Second.Hp -= 3;
+								result += 3 / Second.Hp;
+							}
+						}
+					}
+					if (First.Hp <= 0)
+					{
+						flag = false;
+						fullRes -= 13;
+					}
 					// Расчитываем урон и флаг. Заносим результаты в таблицы
+
+					FirstM[firstStart.x + firstStart.y * 16][secondStart.x + secondStart.y * 16][FSkill] =
+						FirstM[firstStart.x + firstStart.y * 16][secondStart.x + secondStart.y * 16][FSkill] +
+						alpha * (result + 
+							gamma * FirstM[FR.pos.x + FR.pos.y * 16][secondStart.x + secondStart.y * 16][FR.skill] - 
+							FirstM[firstStart.x + firstStart.y * 16][secondStart.x + secondStart.y * 16][FSkill]);
+					FSkill = FR.skill;
+					SecondM[secondStart.x + secondStart.y * 16][First.SkillPosition.x + First.SkillPosition.y * 16][SSkill] = 
+						SecondM[secondStart.x + secondStart.y * 16][First.SkillPosition.x + First.SkillPosition.y * 16][SSkill] + 
+						alpha * (-result + 
+							gamma * SecondM[SR.pos.x + SR.pos.y * 16][First.SkillPosition.x + First.SkillPosition.y * 16][SR.skill] -
+							SecondM[secondStart.x + secondStart.y * 16][First.SkillPosition.x + First.SkillPosition.y * 16][SSkill]);
 				}
+				fullRes += result;
+
+				gameRes[i][j] = gameRes[i][j] + alpha * (fullRes - gameRes[i][j]);
 				//победитель получит +13 очков, заносим их в таблицу результатов.
 
 				// Каждые N итераций сохраняем. в файлы
